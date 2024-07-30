@@ -7,9 +7,13 @@ import { EditorConfig } from "@layerhub-io/types"
 interface Props {
   config?: Partial<EditorConfig>
 }
+
 export const Canvas = (props: Props) => {
   const context = React.useContext(Context)
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const [isPanning, setIsPanning] = React.useState(false)
+  const [startPanPosition, setStartPanPosition] = React.useState({ x: 0, y: 0 })
+  const editorRef = React.useRef<Editor | null>(null)
 
   React.useEffect(() => {
     const container = containerRef.current as HTMLDivElement
@@ -25,6 +29,7 @@ export const Canvas = (props: Props) => {
       },
       state: context,
     })
+    editorRef.current = editor
 
     const resizeObserver = new ResizeObserver((entries) => {
       const { width = clientWidth, height = clientHeight } = (entries[0] && entries[0].contentRect) || {}
@@ -34,14 +39,54 @@ export const Canvas = (props: Props) => {
       })
     })
     resizeObserver.observe(container)
+
+    container.addEventListener('mousedown', handleMouseDown)
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('mouseup', handleMouseUp)
+    container.addEventListener('wheel', handleWheel)
+
     return () => {
       editor.destroy()
       if (container) {
         resizeObserver.unobserve(container)
+        container.removeEventListener('mousedown', handleMouseDown)
+        container.removeEventListener('mousemove', handleMouseMove)
+        container.removeEventListener('mouseup', handleMouseUp)
+        container.removeEventListener('wheel', handleWheel)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleMouseDown = (e: MouseEvent) => {
+    setIsPanning(true)
+    setStartPanPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isPanning || !editorRef.current) return
+    const dx = e.clientX - startPanPosition.x
+    const dy = e.clientY - startPanPosition.y
+    editorRef.current.canvas.canvas.relativePan({ x: dx, y: dy })
+    setStartPanPosition({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleMouseUp = () => {
+    setIsPanning(false)
+  }
+
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault()
+    if (editorRef.current) {
+      if (e.shiftKey) {
+        // Shift + wheel for horizontal scrolling
+        editorRef.current.canvas.canvas.relativePan({ x: -e.deltaY, y: 0 })
+      } else {
+        // Normal wheel for vertical scrolling
+        editorRef.current.canvas.canvas.relativePan({ x: 0, y: -e.deltaY })
+      }
+    }
+  }
+
   return (
     <div
       id="layerhub_io_canvas_container"

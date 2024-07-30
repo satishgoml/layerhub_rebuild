@@ -104,6 +104,7 @@ class Scene extends Base {
    */
   public exportLayers = async (template: IScene) => {
     let elements: any[] = []
+    // @ts-ignore
     for (const [index, layer] of template.layers.entries()) {
       if (layer.type === "StaticVideo") {
         elements = elements.concat({
